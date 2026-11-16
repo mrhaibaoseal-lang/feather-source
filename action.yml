@@ -57,4 +57,4 @@ runs:
           gh release delete "$TAG" --yes --cleanup-tag
         fi
         gh release create "$TAG" "${ASSETS[@]}" --title "$NAME $VER ($BUILD)" --notes "$BODY" --latest=false
-        echo "✓ 已發佈 $TAG，Feather 重新整理來源即可看到"
+        echo "✓ 已發佈 ${TAG}，Feather 重新整理來源即可看到"
