@@ -61,7 +61,7 @@ export default {
           bundleIdentifier: meta.bundleIdentifier,
           developerName: env.DEVELOPER_NAME || env.GITHUB_USER,
           localizedDescription: meta.description || meta.name,
-          iconURL: icon,
+          iconURL: icon || `https://github.com/${env.GITHUB_USER}.png?size=512`, // Feather 不接受空字串
           tintColor: env.TINT || "#7B6CF6",
           versions,
           // 舊版 AltStore 欄位（相容用）
