@@ -1,0 +1,8 @@
+name = "feather-source"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+GITHUB_USER = "mrhaibaoseal-lang"
+SOURCE_NAME = "老鼠公爵的私人商店"
+DEVELOPER_NAME = "老鼠公爵"

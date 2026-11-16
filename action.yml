@@ -1,0 +1,60 @@
+name: Publish to private Feather source
+description: 把 IPA 發佈成 GitHub Release，並附上 Feather 來源需要的資料（Worker 會自動收錄）
+inputs:
+  ipa:
+    description: IPA 檔路徑
+    required: true
+  icon:
+    description: App 圖示 PNG 路徑（可省略，建議 512 或 1024px、不透明）
+    required: false
+    default: ""
+  notes:
+    description: 這版的更新說明（預設用 commit 訊息）
+    required: false
+    default: ""
+  description:
+    description: App 介紹（顯示在 Feather 的 App 頁面）
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        IPA: ${{ inputs.ipa }}
+        ICON: ${{ inputs.icon }}
+        NOTES: ${{ inputs.notes || github.event.head_commit.message }}
+        DESC: ${{ inputs.description }}
+      run: |
+        set -euo pipefail
+        [ -f "$IPA" ] || { echo "::error::找不到 IPA: $IPA"; exit 1; }
+
+        # 讀 Info.plist
+        TMP=$(mktemp -d)
+        PLIST_PATH=$(unzip -Z1 "$IPA" | grep -E '^Payload/[^/]+\.app/Info\.plist$' | head -n1)
+        unzip -q -o "$IPA" "$PLIST_PATH" -d "$TMP"
+        P="$TMP/$PLIST_PATH"
+        get() { /usr/libexec/PlistBuddy -c "Print :$1" "$P" 2>/dev/null || true; }
+        BID=$(get CFBundleIdentifier)
+        VER=$(get CFBundleShortVersionString); VER=${VER:-1.0}
+        BUILD=$(get CFBundleVersion); BUILD=${BUILD:-1}
+        NAME=$(get CFBundleDisplayName); NAME=${NAME:-$(get CFBundleName)}
+        MINOS=$(get MinimumOSVersion); MINOS=${MINOS:-15.0}
+        echo "→ $NAME ($BID) v$VER ($BUILD)"
+
+        TAG="feather-v${VER}-${BUILD}"
+        META=$(jq -cn --arg bid "$BID" --arg name "$NAME" --arg ver "$VER" --arg build "$BUILD" \
+          --arg minos "$MINOS" --arg desc "$DESC" \
+          '{bundleIdentifier:$bid,name:$name,version:$ver,buildVersion:$build,minOSVersion:$minos,description:$desc}')
+        BODY=$(printf '%s\n\n<!-- feather %s -->\n' "${NOTES:-更新}" "$META")
+
+        ASSETS=("$IPA#app.ipa")
+        if [ -n "$ICON" ] && [ -f "$ICON" ]; then cp "$ICON" "$TMP/feather-icon.png"; ASSETS+=("$TMP/feather-icon.png"); fi
+
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "::warning::版本 $VER ($BUILD) 已發佈過，會覆蓋。Feather 要顯示「有更新」請調高版本號。"
+          gh release delete "$TAG" --yes --cleanup-tag
+        fi
+        gh release create "$TAG" "${ASSETS[@]}" --title "$NAME $VER ($BUILD)" --notes "$BODY" --latest=false
+        echo "✓ 已發佈 $TAG，Feather 重新整理來源即可看到"
